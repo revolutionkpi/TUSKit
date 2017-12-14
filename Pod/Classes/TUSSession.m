@@ -193,37 +193,42 @@
     
     SecTrustRef serverTrust = challenge.protectionSpace.serverTrust;
     
-    // Set SSL policies for domain name check
-    NSMutableArray* policies = [NSMutableArray array];
-    [policies addObject:(__bridge_transfer id)SecPolicyCreateSSL(true, (__bridge CFStringRef)challenge.protectionSpace.host)];
-    SecTrustSetPolicies(serverTrust, (__bridge CFArrayRef)policies);
-    
-    // Evaluate server certificate
-    if(![self isServerTrustValid:serverTrust])
-        completionHandler(NSURLSessionAuthChallengeCancelAuthenticationChallenge, NULL);
-    
-    // Get Pinned certificates
-    NSArray* localPaths = [[NSBundle mainBundle] pathsForResourcesOfType:@"cer" inDirectory:@"."];
-    NSMutableArray* pinnedCertificates = [NSMutableArray array];
-    for(NSString* path in localPaths)
-        [pinnedCertificates addObject:[NSData dataWithContentsOfFile:path]];
-    
-    // Get Server certificates
-    CFIndex count = SecTrustGetCertificateCount(serverTrust);
-    NSUInteger trustedCertificateCount = 0;
-    
-    for (NSInteger i = 0; i < count; i++){
-        SecCertificateRef certificate = SecTrustGetCertificateAtIndex(serverTrust, i);
-        NSData* trustChainCertificate = CFBridgingRelease(SecCertificateCopyData(certificate));
-        if ([pinnedCertificates containsObject:trustChainCertificate])
-            trustedCertificateCount++;
-    }
-    
-    if(trustedCertificateCount){
+    if(self.SSLPinningMode == TUSSSLPinningModeNone){
         NSURLCredential* credential = [NSURLCredential credentialForTrust:serverTrust];
         completionHandler(NSURLSessionAuthChallengeUseCredential, credential);
-    }else{
-        completionHandler(NSURLSessionAuthChallengeCancelAuthenticationChallenge, NULL);
+    }else if(self.SSLPinningMode == TUSSSLPinningModeCertificate){
+        // Set SSL policies for domain name check
+        NSMutableArray* policies = [NSMutableArray array];
+        [policies addObject:(__bridge_transfer id)SecPolicyCreateSSL(true, (__bridge CFStringRef)challenge.protectionSpace.host)];
+        SecTrustSetPolicies(serverTrust, (__bridge CFArrayRef)policies);
+        
+        // Evaluate server certificate
+        if(![self isServerTrustValid:serverTrust])
+            completionHandler(NSURLSessionAuthChallengeCancelAuthenticationChallenge, NULL);
+        
+        // Get Pinned certificates
+        NSArray* localPaths = [[NSBundle mainBundle] pathsForResourcesOfType:@"cer" inDirectory:@"."];
+        NSMutableArray* pinnedCertificates = [NSMutableArray array];
+        for(NSString* path in localPaths)
+            [pinnedCertificates addObject:[NSData dataWithContentsOfFile:path]];
+        
+        // Get Server certificates
+        CFIndex count = SecTrustGetCertificateCount(serverTrust);
+        NSUInteger trustedCertificateCount = 0;
+        
+        for (NSInteger i = 0; i < count; i++){
+            SecCertificateRef certificate = SecTrustGetCertificateAtIndex(serverTrust, i);
+            NSData* trustChainCertificate = CFBridgingRelease(SecCertificateCopyData(certificate));
+            if ([pinnedCertificates containsObject:trustChainCertificate])
+                trustedCertificateCount++;
+        }
+        
+        if(trustedCertificateCount){
+            NSURLCredential* credential = [NSURLCredential credentialForTrust:serverTrust];
+            completionHandler(NSURLSessionAuthChallengeUseCredential, credential);
+        }else{
+            completionHandler(NSURLSessionAuthChallengeCancelAuthenticationChallenge, NULL);
+        }
     }
 }
 
@@ -231,6 +236,6 @@
     SecTrustResultType result;
     SecTrustEvaluate(serverTrust, &result);
     return (result == kSecTrustResultUnspecified || result == kSecTrustResultProceed);
-} 
+}
 
 @end

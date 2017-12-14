@@ -9,6 +9,11 @@
 #import "TUSData.h"
 #import "TUSResumableUpload.h"
 
+typedef NS_ENUM(NSUInteger, TUSSSLPinningMode) {
+    TUSSSLPinningModeNone,
+    TUSSSLPinningModeCertificate
+};
+
 /**
  Session that manages, creates, and reloads TUS uploads using a single NSURLSession and data store
  
@@ -16,6 +21,7 @@
  */
 @interface TUSSession : NSObject
 @property BOOL allowsCellularAccess;
+@property (nonatomic, assign) TUSSSLPinningMode SSLPinningMode;
 
 /**
  Initialize
